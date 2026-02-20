@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Header } from "@/components/Header";
 import { StudentForm } from "@/components/StudentForm";
 import { CollegeCard } from "@/components/CollegeCard";
@@ -16,9 +16,11 @@ import { useToast } from "@/hooks/use-toast";
 import {
   filterColleges,
   sortColleges,
+  applyClientFilters,
   type StudentProfile,
   type SortOption,
 } from "@/data/colleges";
+import { Input } from "@/components/ui/input";
 import { GraduationCap, ArrowDown } from "lucide-react";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -31,6 +33,11 @@ export default function Index() {
   const [results, setResults] = useState<ReturnType<typeof filterColleges>>([]);
   const [sortBy, setSortBy] = useState<SortOption>("rating");
   const [hasSearched, setHasSearched] = useState(false);
+
+  // Client-side filter states
+  const [filterName, setFilterName] = useState("");
+  const [minRating, setMinRating] = useState<number>(0);
+  const [typeFilter, setTypeFilter] = useState<"any" | "private" | "govt">("any");
 
   const [aiText, setAiText] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
@@ -134,7 +141,12 @@ export default function Index() {
     await fetchAIExplanation(p, matched);
   };
 
-  const sorted = sortColleges(results, sortBy);
+  // Apply client filters first, then sort
+  const filteredResults = useMemo(() => {
+    return applyClientFilters(results, { name: filterName, minRating, type: typeFilter });
+  }, [results, filterName, minRating, typeFilter]);
+
+  const sorted = sortColleges(filteredResults, sortBy);
 
   return (
     <div className="min-h-screen animated-gradient-bg">
@@ -159,6 +171,49 @@ export default function Index() {
                 error={aiError}
                 onRetry={() => profile && fetchAIExplanation(profile, results)}
               />
+            </div>
+
+            {/* Client-side filters (name, rating, type) */}
+            <div className="mb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div className="flex gap-2 w-full">
+                  <Input
+                    placeholder="Search college name"
+                    value={filterName}
+                    onChange={(e) => setFilterName(e.target.value)}
+                    className="w-full sm:w-64"
+                  />
+
+                  <Select value={String(minRating)} onValueChange={(v) => setMinRating(parseFloat(v))}>
+                    <SelectTrigger className="w-36 h-8 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">Any rating</SelectItem>
+                      <SelectItem value="3">3★+</SelectItem>
+                      <SelectItem value="4">4★+</SelectItem>
+                      <SelectItem value="4.5">4.5★+</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as "any" | "private" | "govt")}>
+                    <SelectTrigger className="w-36 h-8 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="any">Any type</SelectItem>
+                      <SelectItem value="private">Private</SelectItem>
+                      <SelectItem value="govt">Government</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex-shrink-0">
+                  <Button variant="ghost" size="sm" onClick={() => { setFilterName(""); setMinRating(0); setTypeFilter("any"); }}>
+                    Clear Filters
+                  </Button>
+                </div>
+              </div>
             </div>
 
             {/* Results header + sort */}

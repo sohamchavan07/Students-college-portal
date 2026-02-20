@@ -1,4 +1,0 @@
-project_id = "mzhabeywvanccrdqjung"
-
-[functions.college-recommend]
-verify_jwt = false

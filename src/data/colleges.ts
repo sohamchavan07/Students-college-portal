@@ -291,3 +291,22 @@ export function sortColleges(colleges: College[], sort: SortOption): College[] {
     return 0;
   });
 }
+
+export interface ClientFilters {
+  name?: string;
+  minRating?: number; // 0-5
+  type?: "any" | CollegeType;
+}
+
+export function applyClientFilters(colleges: College[], filters: ClientFilters): College[] {
+  const name = (filters.name ?? "").trim().toLowerCase();
+  const minRating = filters.minRating ?? 0;
+  const type = filters.type ?? "any";
+
+  return colleges.filter((c) => {
+    if (name && !c.name.toLowerCase().includes(name)) return false;
+    if (c.rating < minRating) return false;
+    if (type !== "any" && c.type !== type) return false;
+    return true;
+  });
+}
