@@ -1,3 +1,4 @@
+import OpenAI from "openai";
 import { useState, useCallback, useMemo } from "react";
 import { Header } from "@/components/Header";
 import { StudentForm } from "@/components/StudentForm";
@@ -26,6 +27,11 @@ import { GraduationCap, ArrowDown } from "lucide-react";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
+const openai = new OpenAI({
+  apiKey: import.meta.env.VITE_OPENAI_API_KEY,
+  dangerouslyAllowBrowser: true,
+});
+
 export default function Index() {
   const { toast } = useToast();
 
@@ -47,77 +53,52 @@ export default function Index() {
 
   const fetchAIExplanation = useCallback(
     async (p: StudentProfile, matched: ReturnType<typeof filterColleges>) => {
+      if (!import.meta.env.VITE_OPENAI_API_KEY) {
+        setAiError("OpenAI API key is missing. Please check your .env.local file.");
+        return;
+      }
+
       setAiText("");
       setAiError(null);
       setAiLoading(true);
 
       try {
-        const resp = await fetch(`${SUPABASE_URL}/functions/v1/college-recommend`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify({
-            percentile: p.percentile,
-            stream: p.stream,
-            location: p.location,
-            budget: p.budget,
-            matchedColleges: matched.map((c) => c.name),
-          }),
+        const stream = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            {
+              role: "system",
+              content: "You are a helpful college counselor. Explain why the following colleges are good matches for the student's academic profile (percentile), stream preference, and budget. Be concise and encouraging."
+            },
+            {
+              role: "user",
+              content: `Student Profile:
+- Percentile: ${p.percentile}
+- Stream: ${p.stream}
+- Budget Range: ${p.budget}
+- Location: ${p.location}
+
+Matched Colleges: ${matched.map((c) => c.name).join(", ")}`
+            }
+          ],
+          stream: true,
         });
 
-        if (!resp.ok) {
-          const data = await resp.json().catch(() => ({ error: "Unknown error" }));
-          if (resp.status === 429) {
-            toast({ title: "Rate limit exceeded", description: data.error, variant: "destructive" });
-          } else if (resp.status === 402) {
-            toast({ title: "Credits exhausted", description: data.error, variant: "destructive" });
-          }
-          setAiError(data.error ?? "Failed to generate explanation.");
-          setAiLoading(false);
-          return;
-        }
-
-        if (!resp.body) {
-          setAiError("No response from AI.");
-          setAiLoading(false);
-          return;
-        }
-
-        const reader = resp.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-        let streamDone = false;
-
-        while (!streamDone) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-
-          let newlineIdx: number;
-          while ((newlineIdx = buffer.indexOf("\n")) !== -1) {
-            let line = buffer.slice(0, newlineIdx);
-            buffer = buffer.slice(newlineIdx + 1);
-            if (line.endsWith("\r")) line = line.slice(0, -1);
-            if (line.startsWith(":") || line.trim() === "") continue;
-            if (!line.startsWith("data: ")) continue;
-            const jsonStr = line.slice(6).trim();
-            if (jsonStr === "[DONE]") { streamDone = true; break; }
-            try {
-              const parsed = JSON.parse(jsonStr);
-              const chunk = parsed.choices?.[0]?.delta?.content as string | undefined;
-              if (chunk) setAiText((prev) => prev + chunk);
-            } catch {
-              buffer = line + "\n" + buffer;
-              break;
-            }
+        for await (const chunk of stream) {
+          const content = chunk.choices[0]?.delta?.content;
+          if (content) {
+            setAiText((prev) => prev + content);
           }
         }
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : "AI error. Please retry.";
-        setAiError(msg);
-        toast({ title: "AI Error", description: msg, variant: "destructive" });
+      } catch (e: any) {
+        console.error("OpenAI Error:", e);
+        const errorMessage = e?.message || "AI error. Please retry.";
+        setAiError(errorMessage);
+        toast({
+          title: "AI Error",
+          description: errorMessage,
+          variant: "destructive"
+        });
       } finally {
         setAiLoading(false);
       }
@@ -125,17 +106,23 @@ export default function Index() {
     [toast]
   );
 
+
   const handleSubmit = async (p: StudentProfile) => {
     setIsSubmitting(true);
+
     setProfile(p);
+
     const matched = filterColleges(p);
     setResults(matched);
     setHasSearched(true);
+
     setIsSubmitting(false);
 
-    // Scroll to results smoothly
     setTimeout(() => {
-      document.getElementById("results")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById("results")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
     }, 100);
 
     await fetchAIExplanation(p, matched);
@@ -171,81 +158,6 @@ export default function Index() {
                 error={aiError}
                 onRetry={() => profile && fetchAIExplanation(profile, results)}
               />
-            </div>
-
-            {/* Client-side filters (name, rating, type) */}
-            <div className="mb-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <div className="flex gap-2 w-full">
-                  <Input
-                    placeholder="Search college name"
-                    value={filterName}
-                    onChange={(e) => setFilterName(e.target.value)}
-                    className="w-full sm:w-64"
-                  />
-
-                  <Select value={String(minRating)} onValueChange={(v) => setMinRating(parseFloat(v))}>
-                    <SelectTrigger className="w-36 h-8 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="0">Any rating</SelectItem>
-                      <SelectItem value="3">3★+</SelectItem>
-                      <SelectItem value="4">4★+</SelectItem>
-                      <SelectItem value="4.5">4.5★+</SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as "any" | "private" | "govt")}>
-                    <SelectTrigger className="w-36 h-8 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="any">Any type</SelectItem>
-                      <SelectItem value="private">Private</SelectItem>
-                      <SelectItem value="govt">Government</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex-shrink-0">
-                  <Button variant="ghost" size="sm" onClick={() => { setFilterName(""); setMinRating(0); setTypeFilter("any"); }}>
-                    Clear Filters
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {/* Results header + sort */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
-              <div>
-                <h2 className="font-semibold text-foreground text-base">
-                  {results.length > 0
-                    ? `${results.length} college${results.length === 1 ? "" : "s"} matched`
-                    : "No colleges matched"}
-                </h2>
-                {profile && (
-                  <p className="text-sm text-muted-foreground">
-                    {profile.percentile}th percentile · {profile.stream} · {profile.location === "Any" ? "Any Location" : profile.location}
-                  </p>
-                )}
-              </div>
-
-              {results.length > 1 && (
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-sm text-muted-foreground hidden sm:inline">Sort by:</span>
-                  <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
-                    <SelectTrigger className="w-44 h-8 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="rating">Rating (Best first)</SelectItem>
-                      <SelectItem value="fees-asc">Fees: Low to High</SelectItem>
-                      <SelectItem value="fees-desc">Fees: High to Low</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
             </div>
 
             {/* College list or empty state */}
