@@ -27,10 +27,14 @@ import { GraduationCap, ArrowDown } from "lucide-react";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-const openai = new OpenAI({
-  apiKey: import.meta.env.VITE_OPENAI_API_KEY,
-  dangerouslyAllowBrowser: true,
-});
+const getOpenAIClient = () => {
+  const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+  if (!apiKey) return null;
+  return new OpenAI({
+    apiKey,
+    dangerouslyAllowBrowser: true,
+  });
+};
 
 export default function Index() {
   const { toast } = useToast();
@@ -53,8 +57,10 @@ export default function Index() {
 
   const fetchAIExplanation = useCallback(
     async (p: StudentProfile, matched: ReturnType<typeof filterColleges>) => {
-      if (!import.meta.env.VITE_OPENAI_API_KEY) {
-        setAiError("OpenAI API key is missing. Please check your .env.local file.");
+      const client = getOpenAIClient();
+      if (!client) {
+        setAiError("OpenAI API key is missing. Please check your environment variables.");
+        setAiLoading(false);
         return;
       }
 
@@ -63,7 +69,7 @@ export default function Index() {
       setAiLoading(true);
 
       try {
-        const stream = await openai.chat.completions.create({
+        const stream = await client.chat.completions.create({
           model: "gpt-4o-mini",
           messages: [
             {
