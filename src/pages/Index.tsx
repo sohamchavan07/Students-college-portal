@@ -59,7 +59,7 @@ export default function Index() {
     async (p: StudentProfile, matched: ReturnType<typeof filterColleges>) => {
       const client = getOpenAIClient();
       if (!client) {
-        setAiError("OpenAI API key is missing. Please check your environment variables.");
+        setAiError("OpenAI API key is missing. Please check your environment variables. Get your OpenAI API key here: https://platform.openai.com");
         setAiLoading(false);
         return;
       }
