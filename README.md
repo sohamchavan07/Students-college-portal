@@ -50,6 +50,9 @@ npm run dev
 - Fill out the student form
 - Get recommended colleges and AI explanation
 
+## Development Log
+- [Development Log](https://github.com/sohamchavan07/Documentation/blob/2a0e3be036fa103e9f009c77f8abafe7f881e1ca/students-college-portal/devlopmentlog) - Read about production issues encountered during development and deployment
+
 ## License
 MIT
 
