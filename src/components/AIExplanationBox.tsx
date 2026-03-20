@@ -45,7 +45,15 @@ export function AIExplanationBox({ text, isLoading, error, onRetry }: AIExplanat
             {error && !isLoading && (
               <div className="flex items-start gap-2 text-sm text-destructive">
                 <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>{error}</span>
+                <span>
+                  {error.split(/(https?:\/\/[^\s]+)/g).map((part, i) => (
+                    part.match(/^https?:\/\//) ? (
+                      <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="underline font-medium hover:text-destructive/80 transition-colors">
+                        {part}
+                      </a>
+                    ) : part
+                  ))}
+                </span>
               </div>
             )}
 

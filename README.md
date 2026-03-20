@@ -4,7 +4,7 @@ A simple open-source portal for students to get college recommendations using AI
 
 ## Features
 - College recommendation based on student profile
-- AI-powered explanations using OpenAI
+- AI-powered explanations using Groq (Llama 3.3)
 - Supabase backend for data storage
 
 ## Getting Started
@@ -22,11 +22,11 @@ npm install
 
 ### 3. Get Your API Keys
 
-#### OpenAI API Key
-- Sign up at [OpenAI](https://platform.openai.com/signup)
-- Go to your account dashboard
-- Create an API key
-- Copy your API key
+#### Groq API Key
+- Sign up at [Groq Console](https://console.groq.com)
+- Go to the API Keys section
+- Create a new API key
+- Copy your API key and add it to `.env` as `VITE_GROQ_API_KEY`
 
 #### Supabase API Key
 - Sign up at [Supabase](https://supabase.com/)
@@ -37,8 +37,9 @@ npm install
 ### 4. Configure Environment Variables
 Create a `.env` file in the root directory and add:
 ```
-OPENAI_API_KEY=your-openai-api-key
-SUPABASE_KEY=your-supabase-key
+VITE_GROQ_API_KEY=your-groq-api-key
+VITE_SUPABASE_URL=your-supabase-url
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 ```
 
 ### 5. Start the Project

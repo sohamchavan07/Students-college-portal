@@ -59,7 +59,7 @@ export default function Index() {
     async (p: StudentProfile, matched: ReturnType<typeof filterColleges>) => {
       const client = getGroqClient();
       if (!client) {
-        setAiError("Groq API key is missing. Please check your environment variables.");
+        setAiError("Groq API key is missing. Please check your environment variables. Get your key here: https://console.groq.com");
         setAiLoading(false);
         return;
       }
