@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import Groq from "groq-sdk";
 import { useState, useCallback, useMemo } from "react";
 import { Header } from "@/components/Header";
 import { StudentForm } from "@/components/StudentForm";
@@ -27,10 +27,10 @@ import { GraduationCap, ArrowDown } from "lucide-react";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-const getOpenAIClient = () => {
-  const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+const getGroqClient = () => {
+  const apiKey = import.meta.env.VITE_GROQ_API_KEY;
   if (!apiKey) return null;
-  return new OpenAI({
+  return new Groq({
     apiKey,
     dangerouslyAllowBrowser: true,
   });
@@ -57,9 +57,9 @@ export default function Index() {
 
   const fetchAIExplanation = useCallback(
     async (p: StudentProfile, matched: ReturnType<typeof filterColleges>) => {
-      const client = getOpenAIClient();
+      const client = getGroqClient();
       if (!client) {
-        setAiError("OpenAI API key is missing. Please check your environment variables. Get your OpenAI API key here: https://platform.openai.com");
+        setAiError("Groq API key is missing. Please check your environment variables.");
         setAiLoading(false);
         return;
       }
@@ -70,7 +70,7 @@ export default function Index() {
 
       try {
         const stream = await client.chat.completions.create({
-          model: "gpt-4o-mini",
+          model: "llama-3.3-70b-versatile",
           messages: [
             {
               role: "system",
@@ -88,6 +88,9 @@ Matched Colleges: ${matched.map((c) => c.name).join(", ")}`
             }
           ],
           stream: true,
+          temperature: 1,
+          max_completion_tokens: 1024,
+          top_p: 1,
         });
 
         for await (const chunk of stream) {
@@ -97,7 +100,7 @@ Matched Colleges: ${matched.map((c) => c.name).join(", ")}`
           }
         }
       } catch (e: any) {
-        console.error("OpenAI Error:", e);
+        console.error("Groq Error:", e);
         const errorMessage = e?.message || "AI error. Please retry.";
         setAiError(errorMessage);
         toast({
